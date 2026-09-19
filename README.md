@@ -8,7 +8,9 @@ call an AI provider while that on-chain session is active and within budget. Whe
 finishes — or the user hits STOP — the stream settles on chain and the user pays for
 exactly the seconds the service was working.
 
-Deployed Contract : 0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
+Live app: https://app-ruddy-five-86.vercel.app/
+
+Deployed Contract: `0x3e515c11B9B7A5E1398B614FbFe87A8570c95882`
 ```
 Start  →  AI works  →  MON flows  →  Service finishes / user stops  →  Stream settles
 ```
@@ -22,8 +24,8 @@ authorization signal for service execution. See [docs/PRD_V2.md §3](./docs/PRD_
 
 ## Status
 
-Pre-build. Documentation complete, no code written yet.
-Target: Monad Testnet (chain ID 10143, native token MON).
+Live on Monad Testnet (chain ID 10143, native token MON).
+Use the [operator manual](./docs/MANUAL.md) for the deployed site walkthrough.
 
 ## Documentation
 
@@ -42,6 +44,7 @@ field-guide compliance map.
 | [TEST_CHECKLIST.md](./docs/TEST_CHECKLIST.md) | How do we prove it works? |
 | [ROLLBACK.md](./docs/ROLLBACK.md) | How do we get back to a working state? |
 | [FEATURE.md](./docs/FEATURE.md) | Per-feature trace: found → scoped → tried → verified. |
+| [MANUAL.md](./docs/MANUAL.md) | How to use the live site and run the service flows. |
 
 ## Planned layout
 
