@@ -9,13 +9,13 @@ Every new AI session starts with amnesia. This file is the difference between re
 ## Current state
 
 ```
-STATUS        P4 COMPLETE — real Claude stream works and STOP terminates via
-              gateway chain poll observing session_inactive
-PHASE         P4 done · P5 image generation next
+STATUS        P5 COMPLETE — real image generation session renders and
+              auto-settles on Monad Testnet
+PHASE         P5 done · P6 simultaneous sessions next
 LAST TAG      checkpoint/p4-claude-stop
 CONTRACT      0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
 BLOCKERS      none
-NEXT ACTION   P5 — image provider interface/session flow, mock first if needed
+NEXT ACTION   P6 — simultaneous Claude + Image sessions and aggregate flow
 ```
 
 **Live values to keep current — these are the ones a cold session needs first:**
@@ -38,6 +38,38 @@ NEXT ACTION   P5 — image provider interface/session flow, mock first if needed
 Newest entry at the top. Five lines each — that is the whole discipline.
 
 ```
+─────────────────────────────────────────────────────────────
+SESSION 07 · 2026-09-19 14:45 · Codex GPT-5 · P5
+DID        Added ImageProvider selection with mock safety net and
+           Pollinations text-to-image adapter behind IMAGE_PROVIDER.
+           /api/image now authorizes signed IMAGE sessions, runs the provider,
+           and calls settler stopSession automatically when the image lands.
+           Added Image Stream UI: independent IMAGE session opener, 0.010
+           MON/s ticker, prompt box, Generate Image button, provider label,
+           rendered image, open tx, and auto-settle tx.
+LEFT       P6–P8.
+BROKEN     nothing known from build. Upload is intentionally cut; text-to-image
+           only per P5 cut-list. If IMAGE_PROVIDER=mock, UI discloses it.
+WATCH      Do not run npm dev from Codex; user is running the server manually.
+           app/.env.local must contain SETTLER_PRIVATE_KEY for auto-settle.
+           Screenshot QA found two fixes after first live P5 run: terminal
+           ticker now freezes to chain truth after settlement, and /api/image
+           reports image_provider_failed vs settlement_failed instead of
+           masking all non-auth errors as chain_read_failed. UI now includes
+           a manual Stop Image backstop for failed active sessions.
+           Second live run found auto-settle can race/duplicate and revert
+           SessionNotActive; settleSession is now idempotent and returns
+           already_settled with final accrued instead of surfacing a failure.
+NEXT       P6 · simultaneous Claude + Image sessions and aggregate spend bar.
+GATE       cd app && npm run build: ✓ Compiled successfully;
+           ✓ Generating static pages (6/6)
+           Browser wallet run: Image session 15, rate 0.00001 MON/s,
+           prompt "old american haunted house", provider pollinations,
+           image rendered, status SETTLED, consumed 0.000210 MON,
+           chain accrued 0.000210 MON, remaining 0.999790 MON.
+           open 0xd358b8167f2b2f4837b127e25e9358e7052e8d8838165d4396e306825fc41ed2
+           auto-settle 0x8a4bfe4ec588978f0d334da8dd088d4106b4588d4af32d18d9a57ed47632bdab
+─────────────────────────────────────────────────────────────
 ─────────────────────────────────────────────────────────────
 SESSION 06 · 2026-09-19 14:15 · Codex GPT-5 · P4
 DID        Replaced /api/claude placeholder with text/event-stream route.

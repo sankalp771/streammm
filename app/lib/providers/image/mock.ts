@@ -10,7 +10,7 @@ export class MockImageProvider implements ImageProvider {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         resolve({
-          url: "/mock-poster.png",
+          url: "/mock-poster.svg",
         });
       }, 8000);
 

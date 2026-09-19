@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Copy, Loader2, PlugZap, Square, Wallet } from "lucide-react";
+import { Activity, Copy, ImageIcon, Loader2, PlugZap, Square, Wallet } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   keccak256,
@@ -30,6 +30,7 @@ type SessionView = {
 };
 
 const CLAUDE_SERVICE = keccak256(stringToBytes("CLAUDE"));
+const IMAGE_SERVICE = keccak256(stringToBytes("IMAGE"));
 
 export default function Home() {
   const [copied, setCopied] = useState(false);
@@ -45,6 +46,22 @@ export default function Home() {
   const [claudeText, setClaudeText] = useState("");
   const [claudeStatus, setClaudeStatus] = useState<"idle" | "signing" | "streaming" | "complete" | "terminated" | "error">("idle");
   const [claudeError, setClaudeError] = useState<string | undefined>();
+  const [imagePrompt, setImagePrompt] = useState(
+    "A cinematic poster for Stream: pay-per-second AI on Monad, neon green and sky blue, futuristic dashboard",
+  );
+  const [imageRateInput, setImageRateInput] = useState("0.010");
+  const [imageBudgetInput, setImageBudgetInput] = useState("1");
+  const [imageSession, setImageSession] = useState<SessionView | undefined>();
+  const [imageChainAccrued, setImageChainAccrued] = useState<bigint | undefined>();
+  const [imageStatus, setImageStatus] = useState<
+    "idle" | "opening" | "active" | "generating" | "stopping" | "settled" | "error"
+  >("idle");
+  const [imageOpenHash, setImageOpenHash] = useState<`0x${string}` | undefined>();
+  const [imageStopHash, setImageStopHash] = useState<`0x${string}` | undefined>();
+  const [imageUrl, setImageUrl] = useState<string | undefined>();
+  const [imageProvider, setImageProvider] = useState<string | undefined>();
+  const [imageSettlement, setImageSettlement] = useState<string | undefined>();
+  const [imageError, setImageError] = useState<string | undefined>();
   const { address, chain, isConnected } = useAccount();
   const { connect, connectors, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
@@ -62,6 +79,13 @@ export default function Home() {
     ratePerSecond: session?.ratePerSecond,
     maxBudget: session?.maxBudget,
     chainAccrued,
+  });
+  const imageTicker = useTicker({
+    active: Boolean(imageSession?.active),
+    startTime: imageSession?.startTime,
+    ratePerSecond: imageSession?.ratePerSecond,
+    maxBudget: imageSession?.maxBudget,
+    chainAccrued: imageChainAccrued,
   });
 
   useEffect(() => {
@@ -93,6 +117,26 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [publicClient, session?.active, session?.id]);
 
+  useEffect(() => {
+    if (!imageSession?.active || !publicClient) {
+      return;
+    }
+
+    const reconcile = async () => {
+      const accrued = await publicClient.readContract({
+        address: STREAM_CONTRACT_ADDRESS,
+        abi: STREAM_SESSION_ABI,
+        functionName: "accrued",
+        args: [imageSession.id],
+      });
+      setImageChainAccrued(accrued);
+    };
+
+    void reconcile();
+    const timer = window.setInterval(() => void reconcile(), 5000);
+    return () => window.clearInterval(timer);
+  }, [imageSession?.active, imageSession?.id, publicClient]);
+
   const onCopy = async () => {
     if (!address) {
       return;
@@ -113,38 +157,13 @@ export default function Home() {
       setSessionError(undefined);
       setStatus("opening");
 
-      const ratePerSecond = parseEther(rateInput);
-      const maxBudget = parseEther(budgetInput);
-      const hash = await writeContractAsync({
-        address: STREAM_CONTRACT_ADDRESS,
-        abi: STREAM_SESSION_ABI,
-        functionName: "openSession",
-        args: [CLAUDE_SERVICE, ratePerSecond],
-        value: maxBudget,
-      });
+      const { hash, session: nextSession } = await openFundedSession(
+        CLAUDE_SERVICE,
+        parseEther(rateInput),
+        parseEther(budgetInput),
+      );
 
       setTxHash(hash);
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      const opened = parseEventLogs({
-        abi: STREAM_SESSION_ABI,
-        eventName: "SessionOpened",
-        logs: receipt.logs,
-      })[0];
-
-      if (!opened) {
-        throw new Error("SessionOpened event missing from receipt.");
-      }
-
-      const nextSession: SessionView = {
-        id: opened.args.id,
-        payer: opened.args.payer,
-        service: opened.args.service,
-        ratePerSecond: opened.args.ratePerSecond,
-        maxBudget: opened.args.maxBudget,
-        startTime: BigInt(opened.args.startTime),
-        active: true,
-      };
-
       setSession(nextSession);
       setChainAccrued(BigInt(0));
       setStatus("active");
@@ -152,6 +171,36 @@ export default function Home() {
     } catch (error) {
       setStatus("idle");
       setSessionError(error instanceof Error ? error.message : "Failed to open session.");
+    }
+  };
+
+  const openImageSession = async () => {
+    if (!publicClient) {
+      setImageError("Connect a Monad wallet first.");
+      return;
+    }
+
+    try {
+      setImageError(undefined);
+      setImageUrl(undefined);
+      setImageProvider(undefined);
+      setImageSettlement(undefined);
+      setImageStopHash(undefined);
+      setImageStatus("opening");
+
+      const { hash, session: nextSession } = await openFundedSession(
+        IMAGE_SERVICE,
+        parseEther(imageRateInput),
+        parseEther(imageBudgetInput),
+      );
+
+      setImageOpenHash(hash);
+      setImageSession(nextSession);
+      setImageChainAccrued(BigInt(0));
+      setImageStatus("active");
+    } catch (error) {
+      setImageStatus("idle");
+      setImageError(error instanceof Error ? error.message : "Failed to open image session.");
     }
   };
 
@@ -245,6 +294,106 @@ export default function Home() {
     }
   };
 
+  const runImage = async () => {
+    if (!imageSession?.active) {
+      setImageError("Open an active image session first.");
+      return;
+    }
+
+    try {
+      setImageError(undefined);
+      setImageUrl(undefined);
+      setImageProvider(undefined);
+      setImageSettlement(undefined);
+      setImageStopHash(undefined);
+      setImageStatus("generating");
+
+      const nonce = `0x${crypto.randomUUID().replaceAll("-", "")}`;
+      const issued = new Date().toISOString();
+      const message = buildAuthorizationMessage(imageSession.id, nonce, issued);
+      const signature = await signMessageAsync({ message });
+      const response = await fetch("/api/image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sessionId: imageSession.id.toString(),
+          nonce,
+          issued,
+          signature,
+          prompt: imagePrompt,
+        }),
+      });
+      const body = (await response.json()) as {
+        detail?: string;
+        error?: string;
+        provider?: string;
+        settledAmount?: string;
+        settlement?: string;
+        stopHash?: `0x${string}`;
+        url?: string;
+      };
+
+      if (!response.ok || !body.url) {
+        if (body.url) {
+          setImageUrl(body.url);
+        }
+        if (body.provider) {
+          setImageProvider(body.provider);
+        }
+        if (body.settlement) {
+          setImageSettlement(body.settlement);
+        }
+        if (body.stopHash) {
+          setImageStopHash(body.stopHash);
+        }
+        throw new Error(body.detail || body.error || `Image request failed with ${response.status}`);
+      }
+
+      setImageUrl(body.url);
+      setImageProvider(body.provider);
+      setImageSettlement(body.settlement);
+      setImageStopHash(body.stopHash);
+      setImageChainAccrued(body.settledAmount ? BigInt(body.settledAmount) : imageChainAccrued);
+      setImageSession({ ...imageSession, active: false });
+      setImageStatus("settled");
+    } catch (error) {
+      setImageStatus("error");
+      setImageError(error instanceof Error ? error.message : "Image generation failed.");
+    }
+  };
+
+  const stopImageSession = async () => {
+    if (!imageSession || !publicClient) {
+      return;
+    }
+
+    try {
+      setImageError(undefined);
+      setImageStatus("stopping");
+      const hash = await writeContractAsync({
+        address: STREAM_CONTRACT_ADDRESS,
+        abi: STREAM_SESSION_ABI,
+        functionName: "stopSession",
+        args: [imageSession.id],
+      });
+
+      setImageStopHash(hash);
+      await publicClient.waitForTransactionReceipt({ hash });
+      const finalAccrued = await publicClient.readContract({
+        address: STREAM_CONTRACT_ADDRESS,
+        abi: STREAM_SESSION_ABI,
+        functionName: "accrued",
+        args: [imageSession.id],
+      });
+      setImageChainAccrued(finalAccrued);
+      setImageSession({ ...imageSession, active: false });
+      setImageStatus("settled");
+    } catch (error) {
+      setImageStatus(imageSession.active ? "error" : "idle");
+      setImageError(error instanceof Error ? error.message : "Failed to stop image session.");
+    }
+  };
+
   const recoverSession = async (sessionId: bigint) => {
     if (!publicClient) {
       return;
@@ -287,11 +436,62 @@ export default function Home() {
 
   const explorerTx = txHash ? `${monadTestnet.blockExplorers.default.url}/tx/${txHash}` : undefined;
   const stopExplorerTx = stopHash ? `${monadTestnet.blockExplorers.default.url}/tx/${stopHash}` : undefined;
+  const imageExplorerTx = imageOpenHash ? `${monadTestnet.blockExplorers.default.url}/tx/${imageOpenHash}` : undefined;
+  const imageStopExplorerTx = imageStopHash ? `${monadTestnet.blockExplorers.default.url}/tx/${imageStopHash}` : undefined;
   const canOpen = isConnected && chain?.id === monadTestnet.id && status !== "opening" && status !== "stopping";
+  const canOpenImage =
+    isConnected &&
+    chain?.id === monadTestnet.id &&
+    imageStatus !== "opening" &&
+    imageStatus !== "generating" &&
+    imageStatus !== "stopping" &&
+    !imageSession?.active;
+
+  const openFundedSession = async (
+    service: `0x${string}`,
+    ratePerSecond: bigint,
+    maxBudget: bigint,
+  ): Promise<{ hash: `0x${string}`; session: SessionView }> => {
+    if (!publicClient) {
+      throw new Error("Connect a Monad wallet first.");
+    }
+
+    const hash = await writeContractAsync({
+      address: STREAM_CONTRACT_ADDRESS,
+      abi: STREAM_SESSION_ABI,
+      functionName: "openSession",
+      args: [service, ratePerSecond],
+      value: maxBudget,
+    });
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    const opened = parseEventLogs({
+      abi: STREAM_SESSION_ABI,
+      eventName: "SessionOpened",
+      logs: receipt.logs,
+    })[0];
+
+    if (!opened) {
+      throw new Error("SessionOpened event missing from receipt.");
+    }
+
+    return {
+      hash,
+      session: {
+        id: opened.args.id,
+        payer: opened.args.payer,
+        service: opened.args.service,
+        ratePerSecond: opened.args.ratePerSecond,
+        maxBudget: opened.args.maxBudget,
+        startTime: BigInt(opened.args.startTime),
+        active: true,
+      },
+    };
+  };
 
   return (
     <main className="min-h-screen bg-[#0a0a0c] text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8">
         <header className="flex items-center justify-between gap-4 border-b border-white/10 pb-5">
           <div>
             <h1 className="text-3xl font-semibold tracking-normal">STREAM</h1>
@@ -515,6 +715,176 @@ export default function Home() {
               <div className="mt-2 flex items-center justify-between gap-3 text-xs text-neutral-500">
                 <span>Claude status: {claudeStatus}</span>
                 {claudeError ? <span className="text-red-300">{claudeError}</span> : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-white/10 bg-neutral-950 p-6 shadow-2xl shadow-black/30 lg:col-span-2">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-normal">Image Stream</h2>
+                <p className="mt-1 text-sm text-neutral-400">
+                  Generate a poster inside a funded IMAGE session that settles when the image lands.
+                </p>
+              </div>
+              <ImageIcon className="h-6 w-6 text-emerald-300" aria-hidden="true" />
+            </div>
+
+            <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2 text-sm">
+                    <span className="text-neutral-400">Rate, MON/s</span>
+                    <input
+                      value={imageRateInput}
+                      disabled={imageStatus === "opening" || imageStatus === "generating" || imageStatus === "stopping"}
+                      onChange={(event) => setImageRateInput(event.target.value)}
+                      className="border border-white/10 bg-black/30 px-3 py-2 font-mono text-neutral-100 outline-none focus:border-emerald-300 disabled:text-neutral-500"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm">
+                    <span className="text-neutral-400">Budget, MON</span>
+                    <input
+                      value={imageBudgetInput}
+                      disabled={imageStatus === "opening" || imageStatus === "generating" || imageStatus === "stopping"}
+                      onChange={(event) => setImageBudgetInput(event.target.value)}
+                      className="border border-white/10 bg-black/30 px-3 py-2 font-mono text-neutral-100 outline-none focus:border-emerald-300 disabled:text-neutral-500"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 border border-white/10 bg-black/30 p-4">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-neutral-400">Status</span>
+                    <span className="font-mono uppercase text-neutral-100">{imageStatus}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-neutral-400">Session</span>
+                    <span className="font-mono text-neutral-100">
+                      {imageSession ? imageSession.id.toString() : "-"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-neutral-400">Consumed</span>
+                    <span className="font-mono tabular-nums text-emerald-200">
+                      {formatMon(imageTicker.consumed)} MON
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-neutral-400">Remaining</span>
+                    <span className="font-mono tabular-nums text-neutral-100">
+                      {imageSession ? `${formatMon(imageTicker.remaining)} MON` : "-"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-neutral-400">Chain accrued</span>
+                    <span className="font-mono tabular-nums text-neutral-100">
+                      {imageChainAccrued === undefined ? "-" : `${formatMon(imageChainAccrued)} MON`}
+                    </span>
+                  </div>
+                </div>
+
+                <label className="grid gap-2 text-sm">
+                  <span className="text-neutral-400">Prompt Image</span>
+                  <textarea
+                    value={imagePrompt}
+                    disabled={imageStatus === "opening" || imageStatus === "generating" || imageStatus === "stopping"}
+                    onChange={(event) => setImagePrompt(event.target.value)}
+                    rows={4}
+                    className="resize-none border border-white/10 bg-black/30 px-3 py-2 text-neutral-100 outline-none focus:border-emerald-300 disabled:text-neutral-500"
+                  />
+                </label>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={!canOpenImage || imageStatus === "active"}
+                    onClick={openImageSession}
+                    className="inline-flex items-center justify-center gap-2 bg-emerald-300 px-4 py-3 text-sm font-semibold text-black hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-400"
+                  >
+                    {imageStatus === "opening" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <PlugZap className="h-4 w-4" />
+                    )}
+                    Open Image Session
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!imageSession?.active || imageStatus === "generating" || imageStatus === "stopping"}
+                    onClick={runImage}
+                    className="inline-flex items-center justify-center gap-2 bg-sky-300 px-4 py-3 text-sm font-semibold text-black hover:bg-sky-200 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-400"
+                  >
+                    {imageStatus === "generating" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ImageIcon className="h-4 w-4" />
+                    )}
+                    Generate Image
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!imageSession?.active || imageStatus === "opening" || imageStatus === "stopping"}
+                    onClick={stopImageSession}
+                    className="inline-flex items-center justify-center gap-2 border border-white/15 px-4 py-3 text-sm text-neutral-200 hover:border-white/30 hover:bg-white/5 disabled:cursor-not-allowed disabled:text-neutral-600"
+                  >
+                    {imageStatus === "stopping" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                    Stop Image
+                  </button>
+                </div>
+
+                <div className="space-y-2 text-xs text-neutral-500">
+                  {imageProvider ? (
+                    <p>
+                      Image provider:{" "}
+                      <span className="font-mono text-neutral-300">{imageProvider}</span>
+                      {imageProvider === "mock" ? " - mock output, real economic session." : null}
+                    </p>
+                  ) : null}
+                  {imageSettlement ? (
+                    <p>
+                      Settlement: <span className="font-mono text-neutral-300">{imageSettlement}</span>
+                    </p>
+                  ) : null}
+                  {imageExplorerTx ? (
+                    <p>
+                      Open tx:{" "}
+                      <a className="text-emerald-200 hover:underline" href={imageExplorerTx} target="_blank" rel="noreferrer">
+                        {imageOpenHash}
+                      </a>
+                    </p>
+                  ) : null}
+                  {imageStopExplorerTx ? (
+                    <p>
+                      Auto-settle tx:{" "}
+                      <a className="text-emerald-200 hover:underline" href={imageStopExplorerTx} target="_blank" rel="noreferrer">
+                        {imageStopHash}
+                      </a>
+                    </p>
+                  ) : null}
+                  {imageError ? <p className="text-red-300">{imageError}</p> : null}
+                </div>
+              </div>
+
+              <div className="flex min-h-[360px] items-center justify-center border border-white/10 bg-black/30 p-4">
+                {imageStatus === "generating" ? (
+                  <div className="flex flex-col items-center gap-3 text-sm text-neutral-400">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-300" />
+                    Image job running while MON accrues.
+                  </div>
+                ) : imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Generated Stream poster"
+                    className="max-h-[560px] w-full object-contain"
+                  />
+                ) : (
+                  <span className="text-sm text-neutral-500">Generated poster will render here.</span>
+                )}
               </div>
             </div>
           </div>

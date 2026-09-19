@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuthError, authorize, watchAuthorization, type RevocationReason } from "@/lib/auth";
+import { getImageProvider } from "@/lib/providers/image";
+import { settleSession } from "@/lib/settle";
 
 export const runtime = "nodejs";
 
@@ -39,13 +41,54 @@ export async function POST(req: NextRequest) {
 
     try {
       console.info("PROVIDER_CALL_STARTED image");
-      return NextResponse.json({
-        ok: true,
-        service: "IMAGE",
-        sessionId: auth.sessionId.toString(),
-        provider: "placeholder",
-        message: "Image provider call path authorized; generation lands in P5.",
-      });
+      const { name, provider } = getImageProvider();
+      let result: { url: string };
+
+      try {
+        result = await provider.generate(parsed.value.prompt, undefined, controller.signal);
+      } catch (error) {
+        if (revoked) {
+          return NextResponse.json({ error: revoked }, { status: 403 });
+        }
+
+        console.error("IMAGE_PROVIDER_FAILED", errorMessage(error));
+        return NextResponse.json(
+          {
+            error: "image_provider_failed",
+            detail: errorMessage(error),
+            provider: name,
+          },
+          { status: 502 },
+        );
+      }
+
+      try {
+        const settlement = await settleSession(auth.sessionId);
+
+        return NextResponse.json({
+          ok: true,
+          service: "IMAGE",
+          sessionId: auth.sessionId.toString(),
+          provider: name,
+          url: result.url,
+          settlement: settlement.alreadySettled ? "already_settled" : "settled",
+          settledAmount: settlement.accrued.toString(),
+          stopHash: settlement.hash,
+        });
+      } catch (error) {
+        console.error("IMAGE_SETTLEMENT_FAILED", shortErrorMessage(error));
+        return NextResponse.json(
+          {
+            error: "settlement_failed",
+            detail: shortErrorMessage(error),
+            service: "IMAGE",
+            sessionId: auth.sessionId.toString(),
+            provider: name,
+            url: result.url,
+          },
+          { status: 502 },
+        );
+      }
     } finally {
       stopWatching();
       if (revoked) {
@@ -58,6 +101,22 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: "chain_read_failed" }, { status: 403 });
   }
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "unknown_error";
+}
+
+function shortErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "unknown_error";
+  }
+
+  if (error.message.includes("SessionNotActive")) {
+    return "session_not_active";
+  }
+
+  return error.message.split("\n")[0] || "unknown_error";
 }
 
 function parseBody(body: unknown):

@@ -42,9 +42,13 @@ export function useTicker({ active, startTime, ratePerSecond, maxBudget, chainAc
 
     setDisplayed((previous) => {
       const next = clampWei(chainAccrued, maxBudget);
+      if (!active) {
+        return next;
+      }
+
       return next > previous ? next : previous;
     });
-  }, [chainAccrued, maxBudget]);
+  }, [active, chainAccrued, maxBudget]);
 
   return useMemo(() => {
     const consumed = maxBudget === undefined ? displayed : clampWei(displayed, maxBudget);

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#07110f"/>
+  <rect x="64" y="64" width="896" height="896" fill="#0e201d" stroke="#63f0bd" stroke-width="6"/>
+  <circle cx="770" cy="250" r="120" fill="#63f0bd" opacity="0.18"/>
+  <circle cx="260" cy="780" r="170" fill="#7dd3fc" opacity="0.16"/>
+  <path d="M178 280h668M178 356h520M178 432h604" stroke="#eafff8" stroke-width="26" stroke-linecap="round"/>
+  <path d="M180 610c88-76 176-76 264 0s176 76 264 0 106-76 136-52" fill="none" stroke="#63f0bd" stroke-width="24" stroke-linecap="round"/>
+  <text x="178" y="545" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="700">STREAM MOCK POSTER</text>
+  <text x="178" y="862" fill="#b7c9c3" font-family="Arial, Helvetica, sans-serif" font-size="34">Economic session is real. Image provider is mock.</text>
+</svg>
