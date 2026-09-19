@@ -4,6 +4,7 @@ import { getImageProvider } from "@/lib/providers/image";
 import { settleSession } from "@/lib/settle";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   let body: unknown;
