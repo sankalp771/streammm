@@ -1,6 +1,8 @@
 "use client";
 
 import { Activity, Copy, ImageIcon, Loader2, PlugZap, Square, Wallet } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   keccak256,
@@ -41,6 +43,7 @@ const CLAUDE_SERVICE = keccak256(stringToBytes("CLAUDE"));
 const IMAGE_SERVICE = keccak256(stringToBytes("IMAGE"));
 
 export default function Home() {
+  const pathname = usePathname();
   const [copied, setCopied] = useState(false);
   const [rateInput, setRateInput] = useState("0.002");
   const [budgetInput, setBudgetInput] = useState("2");
@@ -504,6 +507,10 @@ export default function Home() {
     imageStatus !== "stopping" &&
     !imageSession?.active;
 
+  if (pathname === "/") {
+    return <LandingSelector />;
+  }
+
   const openFundedSession = async (
     service: `0x${string}`,
     ratePerSecond: bigint,
@@ -551,7 +558,9 @@ export default function Home() {
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8">
         <header className="flex items-center justify-between gap-4 border-b border-white/10 pb-5">
           <div>
-            <h1 className="text-3xl font-semibold tracking-normal">STREAM</h1>
+            <Link href="/" className="text-3xl font-semibold tracking-normal hover:text-violet-200">
+              STREAM
+            </Link>
             <p className="mt-1 text-sm text-neutral-400">
               AI services that only cost you while they are working.
             </p>
@@ -698,7 +707,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="border border-white/10 bg-neutral-950 p-6 shadow-2xl shadow-black/30">
+          {pathname !== "/image" ? <div className="border border-white/10 bg-neutral-950 p-6 shadow-2xl shadow-black/30">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold tracking-normal">Claude Stream</h2>
@@ -834,9 +843,9 @@ export default function Home() {
                 {claudeError ? <span className="text-red-300">{claudeError}</span> : null}
               </div>
             </div>
-          </div>
+          </div> : null}
 
-          <div className="border border-white/10 bg-neutral-950 p-6 shadow-2xl shadow-black/30 lg:col-span-2">
+          {pathname !== "/claude" ? <div className="border border-white/10 bg-neutral-950 p-6 shadow-2xl shadow-black/30 lg:col-span-2">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold tracking-normal">Image Stream</h2>
@@ -1005,9 +1014,90 @@ export default function Home() {
                 )}
               </div>
             </div>
-          </div>
+          </div> : null}
         </section>
       </div>
+    </main>
+  );
+}
+
+function LandingSelector() {
+  return (
+    <main className="min-h-screen overflow-hidden bg-[#07060b] text-white">
+      <section className="relative isolate min-h-screen">
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center"
+          style={{ backgroundImage: "url('/stream-hero.png')" }}
+        />
+        <div className="absolute inset-0 -z-10 bg-[#07060b]/55" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(7,6,11,0.98)_0%,rgba(7,6,11,0.82)_38%,rgba(7,6,11,0.12)_78%)]" />
+
+        <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-7 sm:px-10 lg:px-16">
+          <header className="flex items-center justify-between border-b border-white/10 pb-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-9 w-9 items-center justify-center border border-violet-300/50 bg-violet-400/10 text-lg text-violet-200">S</div>
+              <span className="text-lg font-semibold tracking-[0.16em]">STREAM</span>
+              <span className="hidden text-xs uppercase tracking-[0.28em] text-violet-200/70 md:inline">
+                Pay-per-second AI on Monad
+              </span>
+            </div>
+            <div className="border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 font-mono text-xs text-emerald-200">
+              MONAD TESTNET · 10143
+            </div>
+          </header>
+
+          <div className="flex flex-1 items-center py-16 lg:py-24">
+            <div className="max-w-2xl">
+              <p className="mb-5 text-xs font-semibold uppercase tracking-[0.34em] text-violet-200">AI × payments × control</p>
+              <h1 className="max-w-xl text-5xl font-semibold leading-[0.95] tracking-[-0.02em] sm:text-7xl">
+                STREAM
+                <span className="mt-4 block text-violet-300">Only pay while it works.</span>
+              </h1>
+              <p className="mt-7 max-w-lg text-base leading-7 text-neutral-300 sm:text-lg">
+                Fund a live AI session on Monad. Set the rate, set the ceiling, and watch the spend stop when the work stops.
+              </p>
+
+              <div className="mt-10 grid max-w-2xl gap-4 sm:grid-cols-2">
+                <Link
+                  href="/claude"
+                  className="group border border-violet-300/30 bg-[#100d1d]/85 p-5 backdrop-blur-sm transition hover:border-violet-200 hover:bg-[#18102b]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.24em] text-violet-200">Service 01</p>
+                      <h2 className="mt-3 text-2xl font-semibold">Claude Stream</h2>
+                    </div>
+                    <Activity className="h-6 w-6 text-violet-300" aria-hidden="true" />
+                  </div>
+                  <p className="mt-4 text-sm leading-6 text-neutral-400">Stream thinking token by token with a live MON counter and a hard budget cap.</p>
+                  <span className="mt-6 inline-flex items-center text-sm font-semibold text-violet-200 group-hover:text-white">Open Claude <span className="ml-2" aria-hidden="true">→</span></span>
+                </Link>
+
+                <Link
+                  href="/image"
+                  className="group border border-emerald-300/30 bg-[#0b1718]/85 p-5 backdrop-blur-sm transition hover:border-emerald-200 hover:bg-[#102526]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.24em] text-emerald-200">Service 02</p>
+                      <h2 className="mt-3 text-2xl font-semibold">Image Stream</h2>
+                    </div>
+                    <ImageIcon className="h-6 w-6 text-emerald-300" aria-hidden="true" />
+                  </div>
+                  <p className="mt-4 text-sm leading-6 text-neutral-400">Turn a prompt into a poster, settle the session when the image lands, and keep the receipt.</p>
+                  <span className="mt-6 inline-flex items-center text-sm font-semibold text-emerald-200 group-hover:text-white">Open Image <span className="ml-2" aria-hidden="true">→</span></span>
+                </Link>
+              </div>
+
+              <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-xs uppercase tracking-[0.2em] text-neutral-500">
+                <span>Set your limits</span>
+                <span>On-chain settlement</span>
+                <span>Monad Testnet</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
