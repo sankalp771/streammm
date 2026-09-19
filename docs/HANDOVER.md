@@ -9,12 +9,12 @@ Every new AI session starts with amnesia. This file is the difference between re
 ## Current state
 
 ```
-STATUS        Pre-build — documentation complete, no code written
-PHASE         P0 not started
-LAST TAG      none
-CONTRACT      not deployed
+STATUS        P0 complete — repository scaffolded, chain verified, builds passing
+PHASE         P0 complete · P1 ready
+LAST TAG      checkpoint/p0
+CONTRACT      not deployed (scheduled for P1)
 BLOCKERS      none
-NEXT ACTION   P0 — scaffold repo, fund wallet, verify chain ID 10143
+NEXT ACTION   P1 — StreamSession.sol implementation and testnet deployment
 ```
 
 **Live values to keep current — these are the ones a cold session needs first:**
@@ -23,12 +23,12 @@ NEXT ACTION   P0 — scaffold repo, fund wallet, verify chain ID 10143
 |-----|-------|
 | Contract address | *(fill at P1)* |
 | Deploy block | *(fill at P1)* |
-| Deployer address | *(fill at P0)* |
+| Deployer address | *(fill at P0/P1)* |
 | Settler address | *(fill at P1)* |
 | Treasury address | *(fill at P1)* |
 | Chain | Monad Testnet · 10143 · `https://testnet-rpc.monad.xyz` |
 | Explorer | `https://testnet.monadscan.com` |
-| Image provider in use | *(fill at P5 — `mock` or the real adapter)* |
+| Image provider in use | `pollinations` (configured in `.env.local`) |
 
 ---
 
@@ -38,11 +38,24 @@ Newest entry at the top. Five lines each — that is the whole discipline.
 
 ```
 ─────────────────────────────────────────────────────────────
+SESSION 02 · 2026-09-19 12:35 · Gemini 3.8 Flash · P0
+DID        Configured remote https://github.com/sankalp771/streammm.
+           Scaffolded Foundry contracts/ (builds & tests pass).
+           Scaffolded Next.js 14 app/ (npm install + npm run build exits 0).
+           Secured server keys in gitignored .env.local.
+LEFT       P1 through P8.
+BROKEN     nothing
+WATCH      Foundry solc requires UTF-8 without BOM on Windows.
+NEXT       P1 · StreamSession.sol implementation, Foundry tests, deploy
+GATE       cast chain-id: 10143
+           cd app && npm run build: ✓ Compiled successfully, exits 0
+           cd contracts && forge test: [PASS] test_Sanity()
+─────────────────────────────────────────────────────────────
 SESSION 01 · 2026-09-18 · Opus 5 · pre-build
 DID        Read the AI Collaboration Field Guide; produced the v2
            documentation set (PRD, phases, architecture, flow,
            constraints, decisions, tests, rollback, this file).
-LEFT       All nine phases. No code exists yet.
+           left all nine phases. No code exists yet.
 WATCH      Faucet latency can eat P0 — start it draining first.
            Confirm chain ID before writing contract code; the
            testnet was reset from genesis in Dec 2025, so any
