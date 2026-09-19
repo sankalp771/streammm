@@ -8,6 +8,7 @@ call an AI provider while that on-chain session is active and within budget. Whe
 finishes — or the user hits STOP — the stream settles on chain and the user pays for
 exactly the seconds the service was working.
 
+Deployed Contract : 0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
 ```
 Start  →  AI works  →  MON flows  →  Service finishes / user stops  →  Stream settles
 ```
