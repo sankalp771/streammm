@@ -9,7 +9,7 @@ import {
   stringToBytes,
   type Address,
 } from "viem";
-import { useAccount, useBalance, useConnect, useDisconnect, usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, useBalance, useConnect, useDisconnect, usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
 import { useSignMessage } from "wagmi";
 import { STREAM_CONTRACT_ADDRESS, STREAM_SESSION_ABI, monadTestnet } from "@/lib/chain";
 import { formatMon } from "@/lib/money";
@@ -29,6 +29,14 @@ type SessionView = {
   active: boolean;
 };
 
+type TerminalReceipt = {
+  reason?: string;
+  settledAmount: bigint;
+  refundedAmount: bigint;
+  runtimeSeconds: bigint;
+  stopHash?: `0x${string}`;
+};
+
 const CLAUDE_SERVICE = keccak256(stringToBytes("CLAUDE"));
 const IMAGE_SERVICE = keccak256(stringToBytes("IMAGE"));
 
@@ -42,6 +50,7 @@ export default function Home() {
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [stopHash, setStopHash] = useState<`0x${string}` | undefined>();
   const [sessionError, setSessionError] = useState<string | undefined>();
+  const [receipt, setReceipt] = useState<TerminalReceipt | undefined>();
   const [prompt, setPrompt] = useState("Give me a crisp one-paragraph demo pitch for Stream.");
   const [claudeText, setClaudeText] = useState("");
   const [claudeStatus, setClaudeStatus] = useState<"idle" | "signing" | "streaming" | "complete" | "terminated" | "error">("idle");
@@ -62,8 +71,10 @@ export default function Home() {
   const [imageProvider, setImageProvider] = useState<string | undefined>();
   const [imageSettlement, setImageSettlement] = useState<string | undefined>();
   const [imageError, setImageError] = useState<string | undefined>();
+  const [imageReceipt, setImageReceipt] = useState<TerminalReceipt | undefined>();
   const { address, chain, isConnected } = useAccount();
   const { connect, connectors, isPending, error } = useConnect();
+  const { switchChain, error: switchError, isPending: switchPending } = useSwitchChain();
   const { disconnect } = useDisconnect();
   const { data: balance, isLoading: balanceLoading } = useBalance({ address });
   const publicClient = usePublicClient({ chainId: monadTestnet.id });
@@ -155,6 +166,7 @@ export default function Home() {
 
     try {
       setSessionError(undefined);
+      setReceipt(undefined);
       setStatus("opening");
 
       const { hash, session: nextSession } = await openFundedSession(
@@ -170,7 +182,7 @@ export default function Home() {
       window.history.replaceState(null, "", `/?sessionId=${nextSession.id.toString()}`);
     } catch (error) {
       setStatus("idle");
-      setSessionError(error instanceof Error ? error.message : "Failed to open session.");
+      setSessionError(friendlyError(error, "Failed to open session."));
     }
   };
 
@@ -182,6 +194,7 @@ export default function Home() {
 
     try {
       setImageError(undefined);
+      setImageReceipt(undefined);
       setImageUrl(undefined);
       setImageProvider(undefined);
       setImageSettlement(undefined);
@@ -200,7 +213,7 @@ export default function Home() {
       setImageStatus("active");
     } catch (error) {
       setImageStatus("idle");
-      setImageError(error instanceof Error ? error.message : "Failed to open image session.");
+      setImageError(friendlyError(error, "Failed to open image session."));
     }
   };
 
@@ -228,11 +241,12 @@ export default function Home() {
         args: [session.id],
       });
       setChainAccrued(finalAccrued);
+      setReceipt(buildReceipt(session, finalAccrued, "stopped", hash));
       setSession({ ...session, active: false });
       setStatus("stopped");
     } catch (error) {
       setStatus(session.active ? "active" : "idle");
-      setSessionError(error instanceof Error ? error.message : "Failed to stop session.");
+      setSessionError(friendlyError(error, "Failed to stop session."));
     }
   };
 
@@ -282,15 +296,33 @@ export default function Home() {
         terminated(data) {
           setClaudeStatus("terminated");
           setClaudeError(`Stream terminated: ${String(data.reason || "revoked")}`);
+          if (data.settledAmount) {
+            const settledAmount = BigInt(String(data.settledAmount));
+            const refundedAmount = BigInt(String(data.refundedAmount || "0"));
+            const stopHash = typeof data.stopHash === "string" ? data.stopHash as `0x${string}` : undefined;
+            setChainAccrued(settledAmount);
+            setReceipt(buildReceipt(session, settledAmount, String(data.reason || "terminated"), stopHash, refundedAmount));
+            setSession({ ...session, active: false });
+            setStatus("stopped");
+          }
         },
         error(data) {
           setClaudeStatus("error");
           setClaudeError(String(data.detail || data.error || "claude_stream_failed"));
+          if (data.settledAmount) {
+            const settledAmount = BigInt(String(data.settledAmount));
+            const refundedAmount = BigInt(String(data.refundedAmount || "0"));
+            const stopHash = typeof data.stopHash === "string" ? data.stopHash as `0x${string}` : undefined;
+            setChainAccrued(settledAmount);
+            setReceipt(buildReceipt(session, settledAmount, String(data.error || "provider_error"), stopHash, refundedAmount));
+            setSession({ ...session, active: false });
+            setStatus("stopped");
+          }
         },
       });
     } catch (error) {
       setClaudeStatus("error");
-      setClaudeError(error instanceof Error ? error.message : "Claude request failed.");
+      setClaudeError(friendlyError(error, "Claude request failed."));
     }
   };
 
@@ -329,6 +361,8 @@ export default function Home() {
         provider?: string;
         settledAmount?: string;
         settlement?: string;
+        refundedAmount?: string;
+        settlementError?: string;
         stopHash?: `0x${string}`;
         url?: string;
       };
@@ -346,6 +380,18 @@ export default function Home() {
         if (body.stopHash) {
           setImageStopHash(body.stopHash);
         }
+        if (body.settledAmount) {
+          const settledAmount = BigInt(body.settledAmount);
+          const refundedAmount = BigInt(body.refundedAmount || "0");
+          setImageChainAccrued(settledAmount);
+          setImageReceipt(buildReceipt(imageSession, settledAmount, body.error || "image_error", body.stopHash, refundedAmount));
+          setImageSession({ ...imageSession, active: false });
+          setImageStatus(body.settlement ? "settled" : "error");
+          if (body.settledAmount) {
+            setImageError(body.detail || body.error || "Image provider failed after settlement.");
+            return;
+          }
+        }
         throw new Error(body.detail || body.error || `Image request failed with ${response.status}`);
       }
 
@@ -354,11 +400,16 @@ export default function Home() {
       setImageSettlement(body.settlement);
       setImageStopHash(body.stopHash);
       setImageChainAccrued(body.settledAmount ? BigInt(body.settledAmount) : imageChainAccrued);
+      setImageReceipt(
+        body.settledAmount
+          ? buildReceipt(imageSession, BigInt(body.settledAmount), "complete", body.stopHash, BigInt(body.refundedAmount || "0"))
+          : undefined,
+      );
       setImageSession({ ...imageSession, active: false });
       setImageStatus("settled");
     } catch (error) {
       setImageStatus("error");
-      setImageError(error instanceof Error ? error.message : "Image generation failed.");
+      setImageError(friendlyError(error, "Image generation failed."));
     }
   };
 
@@ -386,11 +437,12 @@ export default function Home() {
         args: [imageSession.id],
       });
       setImageChainAccrued(finalAccrued);
+      setImageReceipt(buildReceipt(imageSession, finalAccrued, "stopped", hash));
       setImageSession({ ...imageSession, active: false });
       setImageStatus("settled");
     } catch (error) {
       setImageStatus(imageSession.active ? "error" : "idle");
-      setImageError(error instanceof Error ? error.message : "Failed to stop image session.");
+      setImageError(friendlyError(error, "Failed to stop image session."));
     }
   };
 
@@ -430,7 +482,7 @@ export default function Home() {
       setChainAccrued(accrued);
       setStatus(sessionData[7] ? "active" : "stopped");
     } catch (error) {
-      setSessionError(error instanceof Error ? error.message : "Failed to recover session.");
+      setSessionError(friendlyError(error, "Failed to recover session."));
     }
   };
 
@@ -508,6 +560,21 @@ export default function Home() {
             Monad Testnet · 10143
           </div>
         </header>
+
+        {chain?.id !== undefined && chain.id !== monadTestnet.id ? (
+          <section className="mt-5 flex flex-wrap items-center justify-between gap-3 border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+            <span>Wrong network. Switch your wallet to Monad Testnet before starting a session.</span>
+            <button
+              type="button"
+              disabled={switchPending}
+              onClick={() => switchChain({ chainId: monadTestnet.id })}
+              className="border border-amber-200/40 px-3 py-2 font-semibold hover:bg-amber-200/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {switchPending ? "Switching..." : "Switch network"}
+            </button>
+            {switchError ? <span className="basis-full text-xs text-red-200">{switchError.message}</span> : null}
+          </section>
+        ) : null}
 
         <section className="mt-5 border border-white/10 bg-neutral-950 px-5 py-4 shadow-2xl shadow-black/20">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -732,6 +799,7 @@ export default function Home() {
                 </p>
               ) : null}
               {sessionError ? <p className="text-red-300">{sessionError}</p> : null}
+              {receipt ? <ReceiptView receipt={receipt} /> : null}
             </div>
 
             <div className="mt-6 border-t border-white/10 pt-5">
@@ -916,6 +984,7 @@ export default function Home() {
                     </p>
                   ) : null}
                   {imageError ? <p className="text-red-300">{imageError}</p> : null}
+                  {imageReceipt ? <ReceiptView receipt={imageReceipt} /> : null}
                 </div>
               </div>
 
@@ -940,6 +1009,58 @@ export default function Home() {
         </section>
       </div>
     </main>
+  );
+}
+
+function buildReceipt(
+  session: SessionView,
+  settledAmount: bigint,
+  reason: string,
+  stopHash?: `0x${string}`,
+  refundedAmount?: bigint,
+): TerminalReceipt {
+  const runtimeSeconds = session.ratePerSecond > BigInt(0) ? settledAmount / session.ratePerSecond : BigInt(0);
+  return {
+    reason,
+    settledAmount,
+    refundedAmount: refundedAmount ?? session.maxBudget - settledAmount,
+    runtimeSeconds,
+    stopHash,
+  };
+}
+
+function friendlyError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : "";
+  if (/user rejected|user denied|rejected the request|denied transaction/i.test(message)) {
+    return "Transaction cancelled in wallet.";
+  }
+  if (/rate limit|rate limited|request is being rate limited/i.test(message)) {
+    return "RPC is rate-limited. Wait a moment, then try again.";
+  }
+  return message.split("\n")[0] || fallback;
+}
+
+function ReceiptView({ receipt }: { receipt: TerminalReceipt }) {
+  return (
+    <div className="mt-3 border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-neutral-400">
+      <div className="font-semibold uppercase tracking-wide text-emerald-200">Settlement receipt</div>
+      <div className="mt-2 grid gap-1 sm:grid-cols-2">
+        <span>Reason: <span className="font-mono text-neutral-200">{receipt.reason || "complete"}</span></span>
+        <span>Runtime: <span className="font-mono text-neutral-200">{receipt.runtimeSeconds.toString()}s</span></span>
+        <span>Settled: <span className="font-mono text-neutral-200">{formatMon(receipt.settledAmount)} MON</span></span>
+        <span>Refund: <span className="font-mono text-neutral-200">{formatMon(receipt.refundedAmount)} MON</span></span>
+      </div>
+      {receipt.stopHash ? (
+        <a
+          className="mt-2 inline-block text-emerald-200 hover:underline"
+          href={`${monadTestnet.blockExplorers.default.url}/tx/${receipt.stopHash}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          View settlement transaction
+        </a>
+      ) : null}
+    </div>
   );
 }
 

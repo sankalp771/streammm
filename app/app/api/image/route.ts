@@ -48,15 +48,20 @@ export async function POST(req: NextRequest) {
         result = await provider.generate(parsed.value.prompt, undefined, controller.signal);
       } catch (error) {
         if (revoked) {
-          return NextResponse.json({ error: revoked }, { status: 403 });
+          return NextResponse.json(
+            { error: revoked, ...(await terminalSettlement(auth.sessionId)) },
+            { status: 403 },
+          );
         }
 
         console.error("IMAGE_PROVIDER_FAILED", errorMessage(error));
+        const settlement = await terminalSettlement(auth.sessionId);
         return NextResponse.json(
           {
             error: "image_provider_failed",
             detail: errorMessage(error),
             provider: name,
+            ...settlement,
           },
           { status: 502 },
         );
@@ -100,6 +105,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.code }, { status: error.status });
     }
     return NextResponse.json({ error: "chain_read_failed" }, { status: 403 });
+  }
+}
+
+async function terminalSettlement(sessionId: bigint) {
+  try {
+    const settlement = await settleSession(sessionId);
+    return {
+      settlement: settlement.alreadySettled ? "already_settled" : "settled",
+      settledAmount: settlement.accrued.toString(),
+      refundedAmount: settlement.refunded.toString(),
+      stopHash: settlement.hash,
+    };
+  } catch (error) {
+    return { settlementError: shortErrorMessage(error) };
   }
 }
 

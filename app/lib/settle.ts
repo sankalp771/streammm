@@ -4,6 +4,7 @@ import { monadTestnet, publicClient, STREAM_CONTRACT_ADDRESS, STREAM_SESSION_ABI
 
 export type SettlementResult = {
   accrued: bigint;
+  refunded: bigint;
   alreadySettled: boolean;
   hash?: Hex;
 };
@@ -13,6 +14,7 @@ export async function settleSession(sessionId: bigint): Promise<SettlementResult
   if (!before.active) {
     return {
       accrued: before.accrued,
+      refunded: before.maxBudget - before.accrued,
       alreadySettled: true,
     };
   }
@@ -42,6 +44,7 @@ export async function settleSession(sessionId: bigint): Promise<SettlementResult
     const after = await readSettlementState(sessionId);
     return {
       accrued: after.accrued,
+      refunded: after.maxBudget - after.accrued,
       alreadySettled: false,
       hash,
     };
@@ -53,6 +56,7 @@ export async function settleSession(sessionId: bigint): Promise<SettlementResult
     const after = await readSettlementState(sessionId);
     return {
       accrued: after.accrued,
+      refunded: after.maxBudget - after.accrued,
       alreadySettled: true,
     };
   }
@@ -77,6 +81,7 @@ async function readSettlementState(sessionId: bigint) {
   return {
     active: session[7],
     accrued,
+    maxBudget: session[3],
   };
 }
 

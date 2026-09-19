@@ -9,12 +9,12 @@ Every new AI session starts with amnesia. This file is the difference between re
 ## Current state
 
 ```
-STATUS        P6 COMPLETE — simultaneous Claude + Image sessions verified live
-PHASE         P6 done · P7 failure paths and receipts next
-LAST TAG      checkpoint/p5-image
+STATUS        P7 COMPLETE — failure paths and terminal receipts verified live
+PHASE         P7 done · P8 rehearsal next
+LAST TAG      checkpoint/p6-multi
 CONTRACT      0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
 BLOCKERS      none
-NEXT ACTION   P7 — harden failure paths, terminal receipts, and wrong-network UX
+NEXT ACTION   P8 — freeze features and run three complete demo rehearsals
 ```
 
 **Live values to keep current — these are the ones a cold session needs first:**
@@ -54,6 +54,22 @@ GATE       cd app && npm run build: ✓ Compiled successfully;
            ✓ Generating static pages (6/6). Live gate passed: Claude and Image
            ran concurrently, aggregate reflected both rates, Claude stopped,
            and Image continued independently.
+─────────────────────────────────────────────────────────────
+SESSION 09 · 2026-09-19 · Codex GPT-5 · P7
+DID        Added terminal settlement receipts with runtime, settled amount,
+           refund, reason, and explorer link for Claude and Image. Provider
+           errors and budget revocations now attempt server-side settlement.
+           Added wrong-network banner with one-click Monad Testnet switching.
+LEFT       P8 — final rehearsal and demo/final tag.
+BROKEN     none after live verification.
+WATCH      Do not run npm dev from Codex; user runs the server manually.
+NEXT       Freeze features; run three complete browser rehearsals.
+GATE       cd app && npm run build: ✓ Compiled successfully;
+           ✓ Generating static pages (6/6). forge test -vv: 7 passed;
+           0 failed. Live gate passed: budget exhaustion settled at the cap,
+           wallet rejection left no orphan, wrong network was blocked and
+           switchable, provider failure settled with an error, and RPC failure
+           did not crash the page.
 ─────────────────────────────────────────────────────────────
 ─────────────────────────────────────────────────────────────
 SESSION 07 · 2026-09-19 14:45 · Codex GPT-5 · P5

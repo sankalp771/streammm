@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuthError, authorize, watchAuthorization, type RevocationReason } from "@/lib/auth";
+import { settleSession } from "@/lib/settle";
 
 export const runtime = "nodejs";
 
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
 
           if (!response.ok || !response.body) {
             const detail = await response.text();
-            send("error", { error: "provider_error", detail });
+            send("error", { error: "provider_error", detail, ...(await terminalSettlement(auth.sessionId)) });
             return;
           }
 
@@ -106,11 +107,17 @@ export async function POST(req: NextRequest) {
           send("complete", { sessionId: auth.sessionId.toString() });
         } catch (error) {
           if (controller.signal.aborted) {
-            send("terminated", { reason: revoked || "aborted" });
+            const settlement = revoked === "budget_exhausted"
+              ? await terminalSettlement(auth.sessionId)
+              : {};
+            send("terminated", { reason: revoked || "aborted", ...settlement });
             return;
           }
 
-          send("error", { error: error instanceof Error ? error.message : "claude_stream_failed" });
+          send("error", {
+            error: error instanceof Error ? error.message : "claude_stream_failed",
+            ...(await terminalSettlement(auth.sessionId)),
+          });
         } finally {
           stopWatching();
           if (revoked) {
@@ -137,6 +144,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.code }, { status: error.status });
     }
     return NextResponse.json({ error: "chain_read_failed" }, { status: 403 });
+  }
+}
+
+async function terminalSettlement(sessionId: bigint) {
+  try {
+    const settlement = await settleSession(sessionId);
+    return {
+      settlement: settlement.alreadySettled ? "already_settled" : "settled",
+      settledAmount: settlement.accrued.toString(),
+      refundedAmount: settlement.refunded.toString(),
+      stopHash: settlement.hash,
+    };
+  } catch (error) {
+    return { settlementError: error instanceof Error ? error.message : "settlement_failed" };
   }
 }
 
