@@ -9,26 +9,26 @@ Every new AI session starts with amnesia. This file is the difference between re
 ## Current state
 
 ```
-STATUS        P0 complete — repository scaffolded, chain verified, builds passing
-PHASE         P0 complete · P1 ready
-LAST TAG      checkpoint/p0
-CONTRACT      not deployed (scheduled for P1)
+STATUS        P1 COMPLETE — contract deployed, 7/7 tests pass, app build green
+PHASE         P1 done · P2 (auth + gateway skeleton) next
+LAST TAG      checkpoint/p1-contract-deployed
+CONTRACT      0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
 BLOCKERS      none
-NEXT ACTION   P1 — StreamSession.sol implementation and testnet deployment
+NEXT ACTION   P2 — implement authorize() in lib/auth.ts, gateway route skeletons
 ```
 
 **Live values to keep current — these are the ones a cold session needs first:**
 
 | Key | Value |
 |-----|-------|
-| Contract address | *(fill at P1)* |
-| Deploy block | *(fill at P1)* |
-| Deployer address | *(fill at P0/P1)* |
-| Settler address | *(fill at P1)* |
-| Treasury address | *(fill at P1)* |
+| Contract address | `0x3e515c11B9B7A5E1398B614FbFe87A8570c95882` |
+| Deploy tx | `0x42f01163f4d7d4b82e8ad53b7fa7002047cd7c2154e55a2b230312458ebe5ee2` |
+| Deploy block | `63820620` |
+| Deployer / Settler | `0x8c6b4A4ac2F5f9d3d2604C073a9300c595298A32` (hot wallet) |
+| Treasury | `0x33a5eAD12dE3add8c80635Eef1a4af0c680f2831` (your main wallet) |
 | Chain | Monad Testnet · 10143 · `https://testnet-rpc.monad.xyz` |
 | Explorer | `https://testnet.monadscan.com` |
-| Image provider in use | `pollinations` (configured in `.env.local`) |
+| Image provider | `pollinations` (key in `.env.local`) |
 
 ---
 
@@ -37,6 +37,21 @@ NEXT ACTION   P1 — StreamSession.sol implementation and testnet deployment
 Newest entry at the top. Five lines each — that is the whole discipline.
 
 ```
+─────────────────────────────────────────────────────────────
+SESSION 03 · 2026-09-19 12:55 · Claude Sonnet · P1
+DID        Wrote full StreamSession.sol (CEI reentrancy, accrual formula,
+           isAuthorized, NatSpec). All 7 required tests pass (forge test -vv).
+           Deployed to Monad Testnet. Verified live: openSession/accrual/stopSession.
+           Wrote app/lib/chain.ts with typed ABI + contract address. Build green.
+LEFT       P2–P8.
+BROKEN     nothing
+WATCH      Windows PowerShell Here-String concatenation corrupts TS files with
+           null bytes — always use write_to_file artifact then Copy-Item.
+NEXT       P2 · lib/auth.ts authorize() reading isAuthorized() on-chain via viem
+GATE       forge test -vv: 7 passed; 0 failed
+           openSession tx: 0x05222a22124ebd3284aa188ad02d3ee5dfd867c3387effb8c25d717e81d6dc68
+           stopSession tx: 0xebf6b99d419f0c85eb9845eead5310ab3a2f4b38c655799faa8d78c3937fc98c
+           npm run build: ✓ Compiled successfully, exits 0
 ─────────────────────────────────────────────────────────────
 SESSION 02 · 2026-09-19 12:35 · Gemini 3.8 Flash · P0
 DID        Configured remote https://github.com/sankalp771/streammm.

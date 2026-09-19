@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// src/StreamSession.sol
+
 /// @notice Thrown when caller is not the session payer or the authorized settler.
 error Unauthorized();
 /// @notice Thrown when attempting to operate on an inactive or nonexistent session.
