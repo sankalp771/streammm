@@ -438,6 +438,11 @@ export default function Home() {
   const stopExplorerTx = stopHash ? `${monadTestnet.blockExplorers.default.url}/tx/${stopHash}` : undefined;
   const imageExplorerTx = imageOpenHash ? `${monadTestnet.blockExplorers.default.url}/tx/${imageOpenHash}` : undefined;
   const imageStopExplorerTx = imageStopHash ? `${monadTestnet.blockExplorers.default.url}/tx/${imageStopHash}` : undefined;
+  const claudeLiveRate = session?.active ? session.ratePerSecond : BigInt(0);
+  const imageLiveRate = imageSession?.active ? imageSession.ratePerSecond : BigInt(0);
+  const totalLiveRate = claudeLiveRate + imageLiveRate;
+  const totalConsumed = ticker.consumed + imageTicker.consumed;
+  const activeSessionCount = Number(Boolean(session?.active)) + Number(Boolean(imageSession?.active));
   const canOpen = isConnected && chain?.id === monadTestnet.id && status !== "opening" && status !== "stopping";
   const canOpenImage =
     isConnected &&
@@ -503,6 +508,50 @@ export default function Home() {
             Monad Testnet · 10143
           </div>
         </header>
+
+        <section className="mt-5 border border-white/10 bg-neutral-950 px-5 py-4 shadow-2xl shadow-black/20">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-normal text-neutral-300">Aggregate Flow</h2>
+              <p className="mt-1 text-xs text-neutral-500">
+                Client-side sum of active on-chain sessions. No contract change required.
+              </p>
+            </div>
+            <div className="grid gap-3 text-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:min-w-[560px]">
+              <div className="border border-white/10 bg-black/30 px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-400">CLAUDE</span>
+                  <span className={session?.active ? "font-mono text-emerald-200" : "font-mono text-neutral-600"}>
+                    {formatMon(claudeLiveRate, 3)} MON/s
+                  </span>
+                </div>
+              </div>
+              <div className="border border-white/10 bg-black/30 px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-400">IMAGE</span>
+                  <span className={imageSession?.active ? "font-mono text-emerald-200" : "font-mono text-neutral-600"}>
+                    {formatMon(imageLiveRate, 3)} MON/s
+                  </span>
+                </div>
+              </div>
+              <div className="border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                <div className="flex min-w-44 items-center justify-between gap-4">
+                  <span className="text-emerald-100">TOTAL</span>
+                  <span className="font-mono text-emerald-200">{formatMon(totalLiveRate, 3)} MON/s</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3 text-xs text-neutral-500">
+            <span>
+              Active sessions: <span className="font-mono text-neutral-300">{activeSessionCount}</span>
+            </span>
+            <span>
+              Total consumed shown on this page:{" "}
+              <span className="font-mono text-neutral-300">{formatMon(totalConsumed)} MON</span>
+            </span>
+          </div>
+        </section>
 
         <section className="grid flex-1 gap-5 py-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <div className="border border-white/10 bg-neutral-950 p-6 shadow-2xl shadow-black/30">
