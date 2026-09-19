@@ -9,8 +9,8 @@ Every new AI session starts with amnesia. This file is the difference between re
 ## Current state
 
 ```
-STATUS        P2 COMPLETE — gateway auth refuses unsigned, wrong-wallet,
-              stopped-session, and service-mismatch requests; app build green
+STATUS        P2 COMPLETE — gateway auth refuses unauthorized work; injected
+              wallet connect shows address + MON balance; app build green
 PHASE         P2 done · P3 (frontend shell + live ticker) next
 LAST TAG      checkpoint/p2-auth
 CONTRACT      0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
@@ -44,7 +44,8 @@ DID        Implemented app/lib/auth.ts authorize(), buildAuthorizationMessage(),
            service hashing, in-memory nonce replay protection, and
            watchAuthorization() with cleanup. Wired /api/claude and /api/image
            to refuse before provider call path and log PROVIDER_CALL_STARTED
-           only after auth passes.
+           only after auth passes. Added injected-only wagmi wallet connect
+           on app/page.tsx with connected address, network, and MON balance.
 LEFT       P3–P8.
 BROKEN     nothing
 WATCH      Live session 0 was opened with bytes32("CLAUDE") during P1 testing,
@@ -52,6 +53,7 @@ WATCH      Live session 0 was opened with bytes32("CLAUDE") during P1 testing,
            Keep frontend/service creation aligned with serviceHash().
 NEXT       P3 · build wallet start flow and ticker from SessionOpened.startTime
 GATE       npm run build: ✓ Compiled successfully; ✓ Generating static pages (6/6)
+           home bundle includes injected wallet dashboard; no WalletConnect modal
            no signature /api/claude: HTTP 401 {"error":"bad_request"}
            no signature /api/image: HTTP 401 {"error":"bad_request"}
            stopped session 0 with payer signature: 403 {"error":"session_inactive"}
