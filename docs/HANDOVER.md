@@ -9,13 +9,13 @@ Every new AI session starts with amnesia. This file is the difference between re
 ## Current state
 
 ```
-STATUS        P3 COMPLETE — browser opens/stops live session, ticker and
-              recovery UI visible; app build green
-PHASE         P3 done · P4 Claude stream + STOP next
-LAST TAG      checkpoint/p3-live-ticker
+STATUS        P4 COMPLETE — real Claude stream works and STOP terminates via
+              gateway chain poll observing session_inactive
+PHASE         P4 done · P5 image generation next
+LAST TAG      checkpoint/p4-claude-stop
 CONTRACT      0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
 BLOCKERS      none
-NEXT ACTION   P4 — signed prompt to /api/claude, stream tokens, STOP aborts
+NEXT ACTION   P5 — image provider interface/session flow, mock first if needed
 ```
 
 **Live values to keep current — these are the ones a cold session needs first:**
@@ -38,6 +38,37 @@ NEXT ACTION   P4 — signed prompt to /api/claude, stream tokens, STOP aborts
 Newest entry at the top. Five lines each — that is the whole discipline.
 
 ```
+─────────────────────────────────────────────────────────────
+SESSION 06 · 2026-09-19 14:15 · Codex GPT-5 · P4
+DID        Replaced /api/claude placeholder with text/event-stream route.
+           Route authorizes signed request first, then calls Anthropic streaming
+           Messages API and relays token/complete/terminated/error events.
+           watchAuthorization aborts provider fetch on inactive/exhausted
+           session. Added prompt UI, signMessage authorization, SSE parser,
+           Claude output panel, stream status, and markdown-ish rendering.
+LEFT       P5–P8.
+BROKEN     nothing
+WATCH      No optimistic abort endpoint yet. This is good for the negative
+           proof: STOP enforcement currently depends on the gateway's on-chain
+           watch poll, not client-side cancellation. Next dev must run from
+           app/ with app/.env.local present, or ANTHROPIC_API_KEY is missing.
+           Model ID fixed to claude-sonnet-5 after older aliases returned 404.
+NEXT       P5 · image session end-to-end; build mock/provider abstraction first
+GATE       npm run build: ✓ Compiled successfully; ✓ Generating static pages (6/6)
+           curl no-signature /api/claude: HTTP 401 {"error":"bad_request"}
+           dev server log: POST /api/claude 401, no PROVIDER_CALL_STARTED
+           Browser natural Claude run: session 6 streamed real output for
+           "how can monad and openAI collab?", Claude status complete,
+           session stopped, consumed 0.003160 MON, chain accrued 0.003140 MON.
+           open 0x54ac8ad6b30e8a34c27d883ff53b748bae2305f19760dfbef51499ac7b3e32c2
+           stop 0x4cdd107dde8e8f4fa811c04ae507e2cfcc52eb0497945f8dea40e8e1f3fda57
+           dev server log: PROVIDER_CALL_STARTED claude; POST /api/claude 200
+           Browser STOP run: text halted mid-story, Claude status terminated,
+           UI showed "Stream terminated: session_inactive"; MetaMask activity
+           showed contract interaction; terminal log:
+           PROVIDER_CALL_STARTED claude
+           PROVIDER_CALL_STARTED claude
+           AUTHORIZATION_REVOKED session_inactive
 ─────────────────────────────────────────────────────────────
 SESSION 05 · 2026-09-19 14:05 · Codex GPT-5 · P3
 DID        Added live Claude session controls to app/page.tsx: openSession()

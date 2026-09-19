@@ -37,21 +37,101 @@ export async function POST(req: NextRequest) {
       { payer: auth.payer, service: "CLAUDE" },
     );
 
-    try {
-      console.info("PROVIDER_CALL_STARTED claude");
-      return NextResponse.json({
-        ok: true,
-        service: "CLAUDE",
-        sessionId: auth.sessionId.toString(),
-        provider: "placeholder",
-        message: "Claude provider call path authorized; streaming lands in P4.",
-      });
-    } finally {
-      stopWatching();
-      if (revoked) {
-        console.info(`AUTHORIZATION_REVOKED ${revoked}`);
-      }
-    }
+    const stream = new ReadableStream({
+      async start(streamController) {
+        const encoder = new TextEncoder();
+
+        const send = (event: string, data: unknown) => {
+          streamController.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+          );
+        };
+
+        try {
+          console.info("PROVIDER_CALL_STARTED claude");
+          send("authorized", { sessionId: auth.sessionId.toString() });
+
+          const response = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            signal: controller.signal,
+            headers: {
+              "anthropic-version": "2023-06-01",
+              "content-type": "application/json",
+              "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+            },
+            body: JSON.stringify({
+              model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",
+              max_tokens: 1200,
+              stream: true,
+              messages: [{ role: "user", content: parsed.value.prompt }],
+            }),
+          });
+
+          if (!response.ok || !response.body) {
+            const detail = await response.text();
+            send("error", { error: "provider_error", detail });
+            return;
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split("\n\n");
+            buffer = frames.pop() || "";
+
+            for (const frame of frames) {
+              const dataLine = frame
+                .split("\n")
+                .find((line) => line.startsWith("data: "));
+
+              if (!dataLine) {
+                continue;
+              }
+
+              const payload = JSON.parse(dataLine.slice(6)) as AnthropicStreamEvent;
+              if (payload.type === "content_block_delta" && payload.delta?.type === "text_delta") {
+                send("token", { text: payload.delta.text });
+              }
+            }
+          }
+
+          send("complete", { sessionId: auth.sessionId.toString() });
+        } catch (error) {
+          if (controller.signal.aborted) {
+            send("terminated", { reason: revoked || "aborted" });
+            return;
+          }
+
+          send("error", { error: error instanceof Error ? error.message : "claude_stream_failed" });
+        } finally {
+          stopWatching();
+          if (revoked) {
+            console.info(`AUTHORIZATION_REVOKED ${revoked}`);
+          }
+          streamController.close();
+        }
+      },
+      cancel() {
+        controller.abort("client_disconnected");
+        stopWatching();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "cache-control": "no-cache, no-transform",
+        "content-type": "text/event-stream; charset=utf-8",
+        connection: "keep-alive",
+      },
+    });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.code }, { status: error.status });
@@ -59,6 +139,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "chain_read_failed" }, { status: 403 });
   }
 }
+
+type AnthropicStreamEvent = {
+  type: string;
+  delta?: {
+    type?: string;
+    text?: string;
+  };
+};
 
 function parseBody(body: unknown):
   | { ok: true; value: { sessionId: string; signature: `0x${string}`; nonce: string; issued?: string; prompt: string } }
