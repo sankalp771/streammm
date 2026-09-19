@@ -9,13 +9,13 @@ Every new AI session starts with amnesia. This file is the difference between re
 ## Current state
 
 ```
-STATUS        P2 COMPLETE — gateway auth refuses unauthorized work; injected
-              wallet connect shows address + MON balance; app build green
-PHASE         P2 done · P3 (frontend shell + live ticker) next
-LAST TAG      checkpoint/p2-auth
+STATUS        P3 COMPLETE — browser opens/stops live session, ticker and
+              recovery UI visible; app build green
+PHASE         P3 done · P4 Claude stream + STOP next
+LAST TAG      checkpoint/p3-live-ticker
 CONTRACT      0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
 BLOCKERS      none
-NEXT ACTION   P3 — wallet session start flow, event-derived startTime, live ticker
+NEXT ACTION   P4 — signed prompt to /api/claude, stream tokens, STOP aborts
 ```
 
 **Live values to keep current — these are the ones a cold session needs first:**
@@ -38,6 +38,37 @@ NEXT ACTION   P3 — wallet session start flow, event-derived startTime, live ti
 Newest entry at the top. Five lines each — that is the whole discipline.
 
 ```
+─────────────────────────────────────────────────────────────
+SESSION 05 · 2026-09-19 14:05 · Codex GPT-5 · P3
+DID        Added live Claude session controls to app/page.tsx: openSession()
+           via injected wallet, parse SessionOpened.startTime from receipt,
+           URL recovery with ?sessionId, 100ms local ticker, 5s accrued()
+           reconciliation, chain-accrued display, explorer links, and Stop.
+           Added lib/money.ts and lib/useTicker.ts. Build green.
+LEFT       P4–P8.
+BROKEN     nothing
+WATCH      Two script-based live runs showed block-timestamp granularity:
+           session 2 stopped at 0.124 MON (~62s × 0.002); session 3 at
+           elapsed 60 latest-block read returned 0.122 MON because accrued()
+           was evaluated in a later block. UI must explain/compare by chain
+           timestamp, not naive wall-clock stopwatch.
+NEXT       P4 · Claude prompt stream with signed authorization and STOP
+GATE       npm run build: ✓ Compiled successfully; ✓ Generating static pages (6/6)
+           Browser wallet screenshot: connected 0x33a5...2831 on Monad
+           Testnet, session 4 stopped, consumed/chain accrued 0.026000 MON,
+           remaining 1.974000 MON.
+           browser open:
+           0xe8fe300af9d255429fdb4e4250984e1998087505c7b285bcd2fb949f23cab4e8
+           browser stop:
+           0x9c7b9150f80ce32d58e7a70b48e25223164337aa9c1fad8b6d6228a849da2540
+           Live script session 2:
+           open 0x26d3f6a66d7c44c97808802d6e134bd811e5f0dd100294d65994c7e921c19930
+           accrued after wall wait: 0.124 MON; stop
+           0xc323b1befd26ffd614a3dacbed2273b025f005f3ff474a7f4453107ac8d6b842
+           Live script session 3:
+           open 0x9a106a0e4555c16401a42df3356b205071b3ce122ba3708d1196cb20f7e42427
+           elapsed latest block 60s; accrued read 0.122 MON; stop
+           0x1f4a1e55e3c61980f358b428fcfae2eb70f8978c10b921864e7de5d1188e76cd
 ─────────────────────────────────────────────────────────────
 SESSION 04 · 2026-09-19 13:30 · Codex GPT-5 · P2
 DID        Implemented app/lib/auth.ts authorize(), buildAuthorizationMessage(),
