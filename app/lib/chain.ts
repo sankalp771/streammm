@@ -1,4 +1,4 @@
-import { defineChain, type Address } from "viem";
+import { createPublicClient, defineChain, http, type Address } from "viem";
 
 export const monadTestnet = defineChain({
   id: 10143,
@@ -26,6 +26,11 @@ export const monadTestnet = defineChain({
 export const STREAM_CONTRACT_ADDRESS: Address = (
   process.env.NEXT_PUBLIC_STREAM_CONTRACT || "0x3e515c11B9B7A5E1398B614FbFe87A8570c95882"
 ) as Address;
+
+export const publicClient = createPublicClient({
+  chain: monadTestnet,
+  transport: http(process.env.NEXT_PUBLIC_RPC_URL || "https://testnet-rpc.monad.xyz"),
+});
 
 export const STREAM_SESSION_ABI = [
   {

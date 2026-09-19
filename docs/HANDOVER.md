@@ -9,12 +9,13 @@ Every new AI session starts with amnesia. This file is the difference between re
 ## Current state
 
 ```
-STATUS        P1 COMPLETE — contract deployed, 7/7 tests pass, app build green
-PHASE         P1 done · P2 (auth + gateway skeleton) next
-LAST TAG      checkpoint/p1-contract-deployed
+STATUS        P2 COMPLETE — gateway auth refuses unsigned, wrong-wallet,
+              stopped-session, and service-mismatch requests; app build green
+PHASE         P2 done · P3 (frontend shell + live ticker) next
+LAST TAG      checkpoint/p2-auth
 CONTRACT      0x3e515c11B9B7A5E1398B614FbFe87A8570c95882
 BLOCKERS      none
-NEXT ACTION   P2 — implement authorize() in lib/auth.ts, gateway route skeletons
+NEXT ACTION   P3 — wallet session start flow, event-derived startTime, live ticker
 ```
 
 **Live values to keep current — these are the ones a cold session needs first:**
@@ -37,6 +38,30 @@ NEXT ACTION   P2 — implement authorize() in lib/auth.ts, gateway route skeleto
 Newest entry at the top. Five lines each — that is the whole discipline.
 
 ```
+─────────────────────────────────────────────────────────────
+SESSION 04 · 2026-09-19 13:30 · Codex GPT-5 · P2
+DID        Implemented app/lib/auth.ts authorize(), buildAuthorizationMessage(),
+           service hashing, in-memory nonce replay protection, and
+           watchAuthorization() with cleanup. Wired /api/claude and /api/image
+           to refuse before provider call path and log PROVIDER_CALL_STARTED
+           only after auth passes.
+LEFT       P3–P8.
+BROKEN     nothing
+WATCH      Live session 0 was opened with bytes32("CLAUDE") during P1 testing,
+           while docs and new auth helpers use keccak256("CLAUDE") for P3.
+           Keep frontend/service creation aligned with serviceHash().
+NEXT       P3 · build wallet start flow and ticker from SessionOpened.startTime
+GATE       npm run build: ✓ Compiled successfully; ✓ Generating static pages (6/6)
+           no signature /api/claude: HTTP 401 {"error":"bad_request"}
+           no signature /api/image: HTTP 401 {"error":"bad_request"}
+           stopped session 0 with payer signature: 403 {"error":"session_inactive"}
+           live CLAUDE session against /api/image: 403 {"error":"service_mismatch"}
+           wrong wallet signature: 401 {"error":"signer_mismatch"}
+           service-mismatch test txs:
+           open 0x76f331f4ac03ba02b9b6307d0337106d872da50548329e40d8855ca60ed5fd0c
+           stop 0x1ea28e54e9d93fff74a9b1b728cbf36d2855b0db412891957b7f24fcef5a9abd
+           provider marker check: server log showed only 401/403 POST lines,
+           no PROVIDER_CALL_STARTED for refusal cases.
 ─────────────────────────────────────────────────────────────
 SESSION 03 · 2026-09-19 12:55 · Claude Sonnet · P1
 DID        Wrote full StreamSession.sol (CEI reentrancy, accrual formula,
@@ -124,7 +149,7 @@ Things that will be true for the whole build. Read these before every session.
 Carry these forward until resolved; strike them through when they are.
 
 - [ ] **Image provider** — not chosen. Interface and mock are built first ([D-09](./DECISIONS.md#d-09--image-provider-behind-an-interface-mock-built-first)); the real adapter is a config swap whenever a key arrives. Decide by P5 or ship the mock with disclosure.
-- [ ] **Nonce replay protection** — in scope at P2, first item on that phase's cut list. If cut, record it here and in CONSTRAINTS as a known limitation, and say so if a judge asks.
+- [x] **Nonce replay protection** — P2 includes in-memory replay protection keyed by `sessionId:signer:nonce`. This is demo-scale only; production still needs durable storage.
 - [ ] **Demo rates** — 0.002 MON/s for Claude and 0.010 MON/s for image are placeholders chosen for legibility on screen. Confirm the digits read well at demo resolution during P8; a number nobody can read on a projector is a wasted beat.
 
 ---
